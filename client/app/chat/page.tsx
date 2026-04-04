@@ -112,6 +112,11 @@ export default function ChatPage(): JSX.Element {
     } catch (requestError: unknown) {
       const message = requestError instanceof Error ? requestError.message : "Failed to stream response";
       setError(message);
+
+      if (/please sign in again/i.test(message)) {
+        router.replace("/login");
+      }
+
       setMessages((current) =>
         current.map((item) =>
           item.id === assistantId

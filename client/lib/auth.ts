@@ -50,5 +50,5 @@ export async function forceRefreshAccessToken(): Promise<string | null> {
 
 export async function signOut(): Promise<void> {
   assertSupabaseConfigured();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
 }

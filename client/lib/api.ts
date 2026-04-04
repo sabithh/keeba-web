@@ -1,4 +1,4 @@
-import { forceRefreshAccessToken, getAccessToken, getCurrentUser } from "./auth";
+import { forceRefreshAccessToken, getAccessToken, getCurrentUser, signOut } from "./auth";
 import {
   assertSupabaseConfigured,
   supabase,
@@ -334,8 +334,9 @@ export async function streamChatMessage(
       const refreshedToken = await forceRefreshAccessToken();
 
       if (!refreshedToken) {
+        await signOut();
         throw new Error(
-          "Session expired. Please sign out and sign in again."
+          "Session expired. Please sign in again."
         );
       }
 
@@ -350,8 +351,9 @@ export async function streamChatMessage(
     const errorMessage = await parseError(response);
 
     if (response.status === 401 && /invalid jwt/i.test(errorMessage)) {
+      await signOut();
       throw new Error(
-        "Invalid JWT from Supabase Functions. Set NEXT_PUBLIC_SUPABASE_FUNCTIONS_KEY to your Legacy anon key, redeploy, then sign out and sign in again."
+        "Session token invalid. Please sign in again."
       );
     }
 
