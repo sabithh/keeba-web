@@ -2,7 +2,7 @@ import { getAccessToken, getCurrentUser } from "./auth";
 import {
   assertSupabaseConfigured,
   supabase,
-  supabaseClientKey,
+  supabaseFunctionsKey,
   supabaseFunctionsBaseUrl,
 } from "./supabase";
 
@@ -317,14 +317,22 @@ export async function streamChatMessage(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      apikey: supabaseClientKey,
+      apikey: supabaseFunctionsKey,
     },
     body: JSON.stringify({ content }),
     signal,
   });
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    const errorMessage = await parseError(response);
+
+    if (response.status === 401 && /invalid jwt/i.test(errorMessage)) {
+      throw new Error(
+        "Invalid JWT from Supabase Functions. Set NEXT_PUBLIC_SUPABASE_FUNCTIONS_KEY to your Legacy anon key, redeploy, then sign out and sign in again."
+      );
+    }
+
+    throw new Error(errorMessage);
   }
 
   if (!response.body) {

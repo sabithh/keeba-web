@@ -71,6 +71,18 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+If your Supabase dashboard only shows `sb_publishable` keys, you can use:
+
+```
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_sb_publishable_key
+```
+
+If chat shows `Invalid JWT`, set this using the legacy anon key (JWT-style key):
+
+```
+NEXT_PUBLIC_SUPABASE_FUNCTIONS_KEY=your_legacy_anon_key
+```
+
 Optional override:
 
 ```
@@ -85,6 +97,17 @@ If omitted, the app uses `NEXT_PUBLIC_SUPABASE_URL/functions/v1` automatically.
 2. Import project in Vercel.
 3. Set project root to `client`.
 4. Deploy.
+
+## 5. Auto-Deploy Supabase Functions From GitHub
+
+Workflow file: `.github/workflows/deploy-supabase-functions.yml`
+
+Set these GitHub repository secrets:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+
+After that, any push to `main` that changes files under `supabase/functions/` will auto-deploy both edge functions.
 
 ## Local Development
 
