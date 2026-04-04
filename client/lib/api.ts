@@ -1,5 +1,10 @@
 import { getAccessToken, getCurrentUser } from "./auth";
-import { assertSupabaseConfigured, supabase, supabaseFunctionsBaseUrl } from "./supabase";
+import {
+  assertSupabaseConfigured,
+  supabase,
+  supabaseClientKey,
+  supabaseFunctionsBaseUrl,
+} from "./supabase";
 
 export interface Profile {
   id?: number;
@@ -152,9 +157,26 @@ export async function clearChatHistory(): Promise<void> {
 
 async function parseError(response: Response): Promise<string> {
   try {
-    const body = await response.json();
+    const body = (await response.json()) as {
+      error?: string;
+      message?: string;
+      msg?: string;
+      code?: string;
+    };
     if (body?.error) {
       return body.error as string;
+    }
+
+    if (body?.message) {
+      return body.message;
+    }
+
+    if (body?.msg) {
+      return body.msg;
+    }
+
+    if (body?.code) {
+      return `Request failed (${response.status}): ${body.code}`;
     }
   } catch {
     // ignore json parse errors
@@ -295,7 +317,7 @@ export async function streamChatMessage(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+      apikey: supabaseClientKey,
     },
     body: JSON.stringify({ content }),
     signal,
