@@ -63,7 +63,10 @@ export default function Sidebar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-keeba-border bg-keeba-surface/95 px-3 py-2.5 backdrop-blur md:hidden">
+      <header
+        className="sticky top-0 z-30 flex items-center justify-between border-b border-keeba-border bg-keeba-surface/95 px-3 pb-2.5 backdrop-blur md:hidden"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.55rem)" }}
+      >
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
@@ -92,9 +95,13 @@ export default function Sidebar({
       ) : null}
 
       <aside
-        className={`fixed left-0 top-0 z-30 flex h-[100dvh] w-[86vw] max-w-[290px] flex-col border-r border-keeba-border bg-keeba-surface px-4 py-5 transition-transform duration-300 md:w-[230px] md:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex h-[100dvh] w-[86vw] max-w-[290px] flex-col border-r border-keeba-border bg-keeba-surface px-4 pb-5 transition-transform duration-300 md:w-[230px] md:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)",
+        }}
       >
         <div className="flex items-center gap-3 border-b border-keeba-border pb-4">
           <img

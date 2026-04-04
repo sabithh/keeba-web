@@ -23,6 +23,7 @@ type UiMessage = ChatMessage & { streaming?: boolean; id: number };
 
 type ParsedVaultCommand =
   | { action: "help" }
+  | { action: "lock" }
   | { action: "list" }
   | { action: "save"; service: string; username: string; password: string; notes: string }
   | { action: "show"; id: number; reveal: boolean }
@@ -83,6 +84,10 @@ function parseVaultCommand(input: string): {
 
   if (commandBody.toLowerCase() === "list") {
     return { command: { action: "list" } };
+  }
+
+  if (commandBody.toLowerCase() === "lock") {
+    return { command: { action: "lock" } };
   }
 
   if (commandBody.toLowerCase().startsWith("save")) {
@@ -277,8 +282,9 @@ export default function ChatPage(): JSX.Element {
                 "- /vault save <service> | <username> | <password> | [optional notes]\n" +
                 "- /vault show <id>\n" +
                 "- /vault reveal <id>\n" +
-                "- /vault delete <id>\n\n" +
-                "Set Vault Passphrase (local) above before using secure commands.",
+                "- /vault delete <id>\n" +
+                "- /vault lock\n\n" +
+                "If a passphrase is needed, Keeba will ask you locally on this device.",
               created_at: new Date().toISOString(),
             },
           ]);
@@ -286,9 +292,36 @@ export default function ChatPage(): JSX.Element {
           return;
         }
 
-        const normalizedPassphrase = vaultPassphrase.trim();
+        if (command.action === "lock") {
+          setVaultPassphrase("");
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content: "Local vault passphrase cleared on this device.",
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+
+        let normalizedPassphrase = vaultPassphrase.trim();
+
+        if (normalizedPassphrase.length < 12 && typeof window !== "undefined") {
+          const prompted = window
+            .prompt("Enter Vault passphrase (minimum 12 characters). It stays local to this device.")
+            ?.trim();
+
+          if (prompted) {
+            normalizedPassphrase = prompted;
+            setVaultPassphrase(prompted);
+          }
+        }
+
         if (normalizedPassphrase.length < 12) {
-          throw new Error("Set a Vault Passphrase (minimum 12 chars) before using secure vault commands.");
+          throw new Error("Vault passphrase is required (minimum 12 chars). Try the command again.");
         }
 
         if (command.action === "save") {
@@ -544,45 +577,25 @@ export default function ChatPage(): JSX.Element {
       />
 
       <section className="mx-auto max-w-6xl px-4 pb-20 pt-3 md:ml-[230px] md:px-7 md:pb-6 md:pt-6">
-        <header className="surface-card grid gap-3 p-4 md:grid-cols-[1fr_minmax(320px,420px)] md:items-start">
-          <div>
+        <header className="surface-card flex flex-wrap items-start justify-between gap-3 p-4">
+          <div className="max-w-3xl">
             <h1 className="text-xl font-semibold text-keeba-accentLight">Conversations</h1>
             <p className="text-sm text-keeba-textMuted">
               {activeThreadId
                 ? "Keeba remembers this conversation context."
-                : "Start a new chat from the sidebar or send a first message."}
+                : "Start a new chat from the sidebar or send a first message."}{" "}
+              Use /vault help for secure credential commands.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase tracking-[1.3px] text-keeba-textMuted">Vault Passphrase (Local)</label>
-            <div className="flex flex-col gap-2 min-[420px]:flex-row">
-              <input
-                type="password"
-                minLength={12}
-                value={vaultPassphrase}
-                onChange={(event) => setVaultPassphrase(event.target.value)}
-                placeholder="Used for /vault commands"
-                className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setVaultPassphrase("")}
-                className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm min-[420px]:w-auto"
-              >
-                Clear
-              </button>
-            </div>
-            <p className="text-[11px] text-keeba-textMuted">Used locally for vault commands and never sent to Keeba AI.</p>
-            <button
-              type="button"
-              disabled={historyClearing}
-              onClick={() => void handleClearHistory()}
-              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {historyClearing ? "Clearing..." : "Clear All Chats"}
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={historyClearing}
+            onClick={() => void handleClearHistory()}
+            className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            {historyClearing ? "Clearing..." : "Clear All Chats"}
+          </button>
         </header>
 
         {error ? (
