@@ -37,6 +37,17 @@ export async function getAccessToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
+export async function forceRefreshAccessToken(): Promise<string | null> {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase.auth.refreshSession();
+
+  if (error) {
+    return null;
+  }
+
+  return data.session?.access_token ?? null;
+}
+
 export async function signOut(): Promise<void> {
   assertSupabaseConfigured();
   await supabase.auth.signOut();

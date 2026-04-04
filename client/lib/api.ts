@@ -1,4 +1,4 @@
-import { getAccessToken, getCurrentUser } from "./auth";
+import { forceRefreshAccessToken, getAccessToken, getCurrentUser } from "./auth";
 import {
   assertSupabaseConfigured,
   supabase,
@@ -306,22 +306,45 @@ export async function streamChatMessage(
   onChunk: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const token = await getAccessToken();
+  async function callChatFunction(accessToken: string): Promise<Response> {
+    return fetch(`${supabaseFunctionsBaseUrl}/chat-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        apikey: supabaseFunctionsKey,
+      },
+      body: JSON.stringify({ content }),
+      signal,
+    });
+  }
+
+  let token = await getAccessToken();
 
   if (!token) {
     throw new Error("Missing authentication token");
   }
 
-  const response = await fetch(`${supabaseFunctionsBaseUrl}/chat-message`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseFunctionsKey,
-    },
-    body: JSON.stringify({ content }),
-    signal,
-  });
+  let response = await callChatFunction(token);
+
+  if (!response.ok) {
+    const firstError = await parseError(response);
+
+    if (response.status === 401 && /invalid jwt/i.test(firstError)) {
+      const refreshedToken = await forceRefreshAccessToken();
+
+      if (!refreshedToken) {
+        throw new Error(
+          "Session expired. Please sign out and sign in again."
+        );
+      }
+
+      token = refreshedToken;
+      response = await callChatFunction(token);
+    } else {
+      throw new Error(firstError);
+    }
+  }
 
   if (!response.ok) {
     const errorMessage = await parseError(response);
