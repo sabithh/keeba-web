@@ -21,9 +21,18 @@ export interface Profile {
 export interface ChatMessage {
   id: number;
   user_id?: string;
+  thread_id?: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
+}
+
+export interface ChatThread {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  last_message_at: string;
 }
 
 export interface DocumentRecord {
@@ -130,14 +139,35 @@ export async function updateProfile(payload: Profile): Promise<Profile> {
   return normalizeProfile(data as Profile);
 }
 
-export async function getChatHistory(): Promise<ChatMessage[]> {
+export async function getChatThreads(): Promise<ChatThread[]> {
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from("chat_threads")
+    .select("id, user_id, title, created_at, last_message_at")
+    .eq("user_id", userId)
+    .order("last_message_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as ChatThread[];
+}
+
+export async function getChatHistory(threadId: string | null): Promise<ChatMessage[]> {
+  if (!threadId) {
+    return [];
+  }
+
   const userId = await getRequiredUserId();
   const { data, error } = await supabase
     .from("chat_messages")
-    .select("id, user_id, role, content, created_at")
+    .select("id, user_id, thread_id, role, content, created_at")
     .eq("user_id", userId)
+    .eq("thread_id", threadId)
     .order("created_at", { ascending: true })
-    .limit(50);
+    .limit(200);
 
   if (error) {
     throw new Error(error.message);
@@ -146,8 +176,18 @@ export async function getChatHistory(): Promise<ChatMessage[]> {
   return (data ?? []) as ChatMessage[];
 }
 
+export async function getChatHistoryByThread(threadId: string): Promise<ChatMessage[]> {
+  return getChatHistory(threadId);
+}
+
 export async function clearChatHistory(): Promise<void> {
   const userId = await getRequiredUserId();
+  const { error: threadError } = await supabase.from("chat_threads").delete().eq("user_id", userId);
+
+  if (threadError) {
+    throw new Error(threadError.message);
+  }
+
   const { error } = await supabase.from("chat_messages").delete().eq("user_id", userId);
 
   if (error) {
@@ -304,8 +344,15 @@ export async function deleteFile(documentId: number): Promise<void> {
 export async function streamChatMessage(
   content: string,
   onChunk: (chunk: string) => void,
-  signal?: AbortSignal
+  options?: {
+    threadId?: string | null;
+    onThreadId?: (threadId: string) => void;
+    signal?: AbortSignal;
+  }
 ): Promise<void> {
+  const signal = options?.signal;
+  const requestedThreadId = options?.threadId ?? null;
+
   async function callChatFunction(accessToken: string): Promise<Response> {
     return fetch(`${supabaseFunctionsBaseUrl}/chat-message`, {
       method: "POST",
@@ -314,7 +361,7 @@ export async function streamChatMessage(
         Authorization: `Bearer ${accessToken}`,
         apikey: supabaseFunctionsKey,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, threadId: requestedThreadId }),
       signal,
     });
   }
@@ -362,6 +409,11 @@ export async function streamChatMessage(
 
   if (!response.body) {
     throw new Error("Streaming is not available in this browser");
+  }
+
+  const resolvedThreadId = response.headers.get("x-thread-id");
+  if (resolvedThreadId && options?.onThreadId) {
+    options.onThreadId(resolvedThreadId);
   }
 
   const reader = response.body.getReader();

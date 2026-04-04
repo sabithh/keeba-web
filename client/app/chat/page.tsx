@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import ChatBubble from "@/components/ChatBubble";
 import Sidebar from "@/components/Sidebar";
 import {
+  ChatThread,
   ChatMessage,
   clearChatHistory,
   getChatHistory,
+  getChatThreads,
   streamChatMessage,
 } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
@@ -16,6 +18,9 @@ type UiMessage = ChatMessage & { streaming?: boolean; id: number };
 
 export default function ChatPage(): JSX.Element {
   const router = useRouter();
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -32,7 +37,8 @@ export default function ChatPage(): JSX.Element {
         return;
       }
 
-      await loadHistory();
+      const initialThreadId = await loadThreads();
+      await loadHistory(initialThreadId);
     })();
   }, [router]);
 
@@ -40,12 +46,46 @@ export default function ChatPage(): JSX.Element {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function loadHistory(): Promise<void> {
-    setLoading(true);
+  async function loadThreads(preferredThreadId?: string | null): Promise<string | null> {
+    setThreadsLoading(true);
     setError(null);
 
     try {
-      const history = await getChatHistory();
+      const nextThreads = await getChatThreads();
+      setThreads(nextThreads);
+
+      let nextActiveThreadId = preferredThreadId ?? activeThreadId;
+
+      if (nextActiveThreadId && !nextThreads.some((thread) => thread.id === nextActiveThreadId)) {
+        nextActiveThreadId = null;
+      }
+
+      if (!nextActiveThreadId && nextThreads.length > 0) {
+        nextActiveThreadId = nextThreads[0].id;
+      }
+
+      setActiveThreadId(nextActiveThreadId);
+      return nextActiveThreadId;
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : "Could not load conversations");
+      return null;
+    } finally {
+      setThreadsLoading(false);
+    }
+  }
+
+  async function loadHistory(threadId: string | null): Promise<void> {
+    setLoading(true);
+    setError(null);
+
+    if (!threadId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const history = await getChatHistory(threadId);
       setMessages(history);
     } catch (requestError: unknown) {
       setError(requestError instanceof Error ? requestError.message : "Could not load chat history");
@@ -86,18 +126,30 @@ export default function ChatPage(): JSX.Element {
     setInput("");
 
     try {
-      await streamChatMessage(content, (chunk) => {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content: `${message.content}${chunk}`,
-                }
-              : message
-          )
-        );
-      });
+      let resolvedThreadId = activeThreadId;
+
+      await streamChatMessage(
+        content,
+        (chunk) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? {
+                    ...message,
+                    content: `${message.content}${chunk}`,
+                  }
+                : message
+            )
+          );
+        },
+        {
+          threadId: activeThreadId,
+          onThreadId: (threadId) => {
+            resolvedThreadId = threadId;
+            setActiveThreadId(threadId);
+          },
+        }
+      );
 
       setMessages((current) =>
         current.map((message) =>
@@ -109,6 +161,8 @@ export default function ChatPage(): JSX.Element {
             : message
         )
       );
+
+      await loadThreads(resolvedThreadId);
     } catch (requestError: unknown) {
       const message = requestError instanceof Error ? requestError.message : "Failed to stream response";
       setError(message);
@@ -140,6 +194,8 @@ export default function ChatPage(): JSX.Element {
     try {
       await clearChatHistory();
       setMessages([]);
+      setThreads([]);
+      setActiveThreadId(null);
     } catch (requestError: unknown) {
       setError(requestError instanceof Error ? requestError.message : "Failed to clear history");
     } finally {
@@ -147,15 +203,38 @@ export default function ChatPage(): JSX.Element {
     }
   }
 
+  async function handleSelectThread(threadId: string): Promise<void> {
+    setActiveThreadId(threadId);
+    await loadHistory(threadId);
+  }
+
+  function handleNewChat(): void {
+    setActiveThreadId(null);
+    setMessages([]);
+    setError(null);
+  }
+
   return (
     <main className="min-h-screen">
-      <Sidebar />
+      <Sidebar
+        chatThreads={threads}
+        activeThreadId={activeThreadId}
+        onSelectThread={(threadId) => {
+          void handleSelectThread(threadId);
+        }}
+        onNewChat={handleNewChat}
+        loadingThreads={threadsLoading}
+      />
 
       <section className="mx-auto max-w-6xl px-4 pb-6 pt-4 md:ml-[230px] md:px-7 md:pt-6">
         <header className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h1 className="text-xl font-semibold text-keeba-accentLight">Conversations</h1>
-            <p className="text-sm text-keeba-textMuted">Keeba remembers your profile, files, and recent messages.</p>
+            <p className="text-sm text-keeba-textMuted">
+              {activeThreadId
+                ? "Keeba remembers this conversation context."
+                : "Start a new chat from the sidebar or send a first message."}
+            </p>
           </div>
           <button
             type="button"
@@ -163,7 +242,7 @@ export default function ChatPage(): JSX.Element {
             onClick={() => void handleClearHistory()}
             className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {historyClearing ? "Clearing..." : "Clear History"}
+            {historyClearing ? "Clearing..." : "Clear All Chats"}
           </button>
         </header>
 
@@ -182,7 +261,11 @@ export default function ChatPage(): JSX.Element {
             <div className="flex h-full items-center justify-center text-center">
               <div>
                 <p className="keeba-logo text-3xl">keeba</p>
-                <p className="mt-2 text-sm text-keeba-textMuted">No chat history yet. Start by asking anything.</p>
+                <p className="mt-2 text-sm text-keeba-textMuted">
+                  {activeThreadId
+                    ? "This chat is empty. Ask anything to begin."
+                    : "No chat selected. Click New Chat in the sidebar to start."}
+                </p>
               </div>
             </div>
           ) : (

@@ -22,9 +22,15 @@ interface DocumentRow {
   extracted_text: string | null;
 }
 
+interface ChatThreadRow {
+  id: string;
+  title: string;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Expose-Headers": "x-thread-id",
 };
 
 function jsonError(message: string, status = 400): Response {
@@ -143,15 +149,56 @@ serve(async (req) => {
   }
 
   let content = "";
+  let requestedThreadId: string | null = null;
   try {
     const body = await req.json();
     content = String(body?.content ?? "").trim();
+    requestedThreadId = body?.threadId ? String(body.threadId).trim() : null;
   } catch {
     return jsonError("Invalid JSON body", 400);
   }
 
   if (!content) {
     return jsonError("content is required", 400);
+  }
+
+  let threadId = requestedThreadId;
+
+  if (threadId) {
+    const threadResult = await supabase
+      .from("chat_threads")
+      .select("id, title")
+      .eq("id", threadId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (threadResult.error) {
+      return jsonError("Failed to load chat thread", 500);
+    }
+
+    if (!threadResult.data) {
+      return jsonError("Thread not found", 404);
+    }
+  } else {
+    const threadTitle = content.slice(0, 60) || "New chat";
+    const createdThreadResult = await supabase
+      .from("chat_threads")
+      .insert({
+        user_id: user.id,
+        title: threadTitle,
+      })
+      .select("id, title")
+      .single();
+
+    if (createdThreadResult.error || !createdThreadResult.data) {
+      return jsonError("Failed to create chat thread", 500);
+    }
+
+    threadId = (createdThreadResult.data as ChatThreadRow).id;
+  }
+
+  if (!threadId) {
+    return jsonError("Thread id is required", 500);
   }
 
   const [profileResult, historyResult, documentsResult] = await Promise.all([
@@ -164,6 +211,7 @@ serve(async (req) => {
       .from("chat_messages")
       .select("role, content")
       .eq("user_id", user.id)
+      .eq("thread_id", threadId)
       .order("created_at", { ascending: false })
       .limit(20),
     supabase
@@ -183,6 +231,7 @@ serve(async (req) => {
 
   const userInsert = await supabase.from("chat_messages").insert({
     user_id: user.id,
+    thread_id: threadId,
     role: "user",
     content,
   });
@@ -263,9 +312,18 @@ serve(async (req) => {
 
         await supabase.from("chat_messages").insert({
           user_id: user.id,
+          thread_id: threadId,
           role: "assistant",
           content: finalText,
         });
+
+        await supabase
+          .from("chat_threads")
+          .update({
+            last_message_at: new Date().toISOString(),
+          })
+          .eq("id", threadId)
+          .eq("user_id", user.id);
 
         controller.close();
       } catch {
@@ -281,6 +339,7 @@ serve(async (req) => {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "x-thread-id": threadId,
     },
   });
 });
