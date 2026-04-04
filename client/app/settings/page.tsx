@@ -14,6 +14,7 @@ const emptyProfile: Profile = {
   address: "",
   occupation: "",
   about_me: "",
+  custom_instructions: "",
 };
 
 export default function SettingsPage(): JSX.Element {

@@ -7,14 +7,153 @@ import {
   ChatThread,
   ChatMessage,
   clearChatHistory,
+  createVaultItem,
+  deleteVaultItem,
   getChatHistory,
   getChatThreads,
+  getVaultItems,
   streamChatMessage,
+  VaultItemRecord,
 } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
+import { decryptVaultPayload, encryptVaultPayload, VaultSecretPayload } from "@/lib/vaultCrypto";
 import { useRouter } from "next/navigation";
 
 type UiMessage = ChatMessage & { streaming?: boolean; id: number };
+
+type ParsedVaultCommand =
+  | { action: "help" }
+  | { action: "list" }
+  | { action: "save"; service: string; username: string; password: string; notes: string }
+  | { action: "show"; id: number; reveal: boolean }
+  | { action: "delete"; id: number };
+
+function nextMessageId(): number {
+  return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function maskSecret(value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  if (value.length <= 4) {
+    return "*".repeat(value.length);
+  }
+
+  return `${value.slice(0, 2)}${"*".repeat(Math.max(6, value.length - 4))}${value.slice(-2)}`;
+}
+
+function redactVaultCommand(input: string): string {
+  const trimmed = input.trim();
+
+  if (!/^\/vault\s+save/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const payload = trimmed.replace(/^\/vault\s+save/i, "").trim();
+  const segments = payload.split("|").map((segment) => segment.trim());
+
+  if (segments.length < 3) {
+    return "/vault save [invalid format]";
+  }
+
+  const redacted = [segments[0], segments[1], "[REDACTED]"];
+
+  if (segments.length > 3) {
+    redacted.push("[NOTES REDACTED]");
+  }
+
+  return `/vault save ${redacted.join(" | ")}`;
+}
+
+function parseVaultCommand(input: string): {
+  command: ParsedVaultCommand | null;
+  error?: string;
+} {
+  const trimmed = input.trim();
+  if (!trimmed.toLowerCase().startsWith("/vault")) {
+    return { command: null };
+  }
+
+  const commandBody = trimmed.slice("/vault".length).trim();
+  if (!commandBody || commandBody.toLowerCase() === "help") {
+    return { command: { action: "help" } };
+  }
+
+  if (commandBody.toLowerCase() === "list") {
+    return { command: { action: "list" } };
+  }
+
+  if (commandBody.toLowerCase().startsWith("save")) {
+    const payload = commandBody.slice("save".length).trim();
+    const segments = payload.split("|").map((segment) => segment.trim());
+
+    if (segments.length < 3) {
+      return {
+        command: null,
+        error: "Use: /vault save <service> | <username> | <password> | [optional notes]",
+      };
+    }
+
+    return {
+      command: {
+        action: "save",
+        service: segments[0],
+        username: segments[1],
+        password: segments[2],
+        notes: segments.slice(3).join(" | "),
+      },
+    };
+  }
+
+  const [action, idText] = commandBody.split(/\s+/, 2);
+  const lowerAction = action.toLowerCase();
+
+  if (lowerAction === "show" || lowerAction === "reveal" || lowerAction === "delete") {
+    const id = Number(idText);
+    if (!Number.isInteger(id) || id <= 0) {
+      return {
+        command: null,
+        error: `Use: /vault ${lowerAction} <id>`,
+      };
+    }
+
+    if (lowerAction === "delete") {
+      return {
+        command: {
+          action: "delete",
+          id,
+        },
+      };
+    }
+
+    return {
+      command: {
+        action: "show",
+        id,
+        reveal: lowerAction === "reveal",
+      },
+    };
+  }
+
+  return {
+    command: null,
+    error: "Unknown vault command. Use /vault help",
+  };
+}
+
+async function getDecryptedVaultItems(passphrase: string): Promise<Array<{ record: VaultItemRecord; secret: VaultSecretPayload }>> {
+  const records = await getVaultItems();
+  const decrypted = await Promise.all(
+    records.map(async (record) => ({
+      record,
+      secret: await decryptVaultPayload(record, passphrase),
+    }))
+  );
+
+  return decrypted;
+}
 
 export default function ChatPage(): JSX.Element {
   const router = useRouter();
@@ -23,6 +162,7 @@ export default function ChatPage(): JSX.Element {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
+  const [vaultPassphrase, setVaultPassphrase] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +239,183 @@ export default function ChatPage(): JSX.Element {
 
     const content = input.trim();
     if (!content || sending) {
+      return;
+    }
+
+    if (content.toLowerCase().startsWith("/vault")) {
+      setError(null);
+      setSending(true);
+      setInput("");
+
+      const userMessage: UiMessage = {
+        id: nextMessageId(),
+        role: "user",
+        content: redactVaultCommand(content),
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages((current) => [...current, userMessage]);
+
+      const parsed = parseVaultCommand(content);
+
+      try {
+        if (!parsed.command) {
+          throw new Error(parsed.error || "Invalid vault command");
+        }
+
+        const command = parsed.command;
+
+        if (command.action === "help") {
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content:
+                "Vault commands:\n" +
+                "- /vault list\n" +
+                "- /vault save <service> | <username> | <password> | [optional notes]\n" +
+                "- /vault show <id>\n" +
+                "- /vault reveal <id>\n" +
+                "- /vault delete <id>\n\n" +
+                "Set Vault Passphrase (local) above before using secure commands.",
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+
+        const normalizedPassphrase = vaultPassphrase.trim();
+        if (normalizedPassphrase.length < 12) {
+          throw new Error("Set a Vault Passphrase (minimum 12 chars) before using secure vault commands.");
+        }
+
+        if (command.action === "save") {
+          const encrypted = await encryptVaultPayload(
+            {
+              service: command.service,
+              username: command.username,
+              password: command.password,
+              notes: command.notes,
+            },
+            normalizedPassphrase
+          );
+
+          await createVaultItem(encrypted);
+
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content: `Saved encrypted credential for ${command.service.trim() || "service"}.`,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+
+        if (command.action === "list") {
+          const decrypted = await getDecryptedVaultItems(normalizedPassphrase);
+
+          if (decrypted.length === 0) {
+            setMessages((current) => [
+              ...current,
+              {
+                id: nextMessageId(),
+                role: "assistant",
+                content: "No vault credentials stored yet.",
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+            return;
+          }
+
+          const listText = decrypted
+            .slice(0, 20)
+            .map((entry) => `${entry.record.id}. ${entry.secret.service} (${entry.secret.username})`)
+            .join("\n");
+
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content: `Vault entries:\n${listText}`,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+
+        if (command.action === "show") {
+          const decrypted = await getDecryptedVaultItems(normalizedPassphrase);
+          const selected = decrypted.find((entry) => entry.record.id === command.id);
+
+          if (!selected) {
+            throw new Error("Vault item not found.");
+          }
+
+          const passwordText = command.reveal
+            ? selected.secret.password
+            : maskSecret(selected.secret.password);
+
+          const response = [
+            `Service: ${selected.secret.service}`,
+            `Username: ${selected.secret.username}`,
+            `Password: ${passwordText}`,
+            selected.secret.notes ? `Notes: ${selected.secret.notes}` : "Notes: (none)",
+          ].join("\n");
+
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content: response,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+
+        if (command.action === "delete") {
+          await deleteVaultItem(command.id);
+
+          setMessages((current) => [
+            ...current,
+            {
+              id: nextMessageId(),
+              role: "assistant",
+              content: `Deleted vault credential #${command.id}.`,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          return;
+        }
+      } catch (requestError: unknown) {
+        const message = requestError instanceof Error ? requestError.message : "Vault command failed";
+        setError(message);
+
+        setMessages((current) => [
+          ...current,
+          {
+            id: nextMessageId(),
+            role: "assistant",
+            content: `Vault error: ${message}`,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } finally {
+        setSending(false);
+      }
+
       return;
     }
 
@@ -236,14 +553,36 @@ export default function ChatPage(): JSX.Element {
                 : "Start a new chat from the sidebar or send a first message."}
             </p>
           </div>
-          <button
-            type="button"
-            disabled={historyClearing}
-            onClick={() => void handleClearHistory()}
-            className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {historyClearing ? "Clearing..." : "Clear All Chats"}
-          </button>
+
+          <div className="flex min-w-[260px] flex-col gap-2">
+            <label className="text-xs uppercase tracking-[1.3px] text-keeba-textMuted">Vault Passphrase (Local)</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                minLength={12}
+                value={vaultPassphrase}
+                onChange={(event) => setVaultPassphrase(event.target.value)}
+                placeholder="Used for /vault commands"
+                className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setVaultPassphrase("")}
+                className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+              >
+                Clear
+              </button>
+            </div>
+            <p className="text-[11px] text-keeba-textMuted">Used locally for vault commands and never sent to Keeba AI.</p>
+            <button
+              type="button"
+              disabled={historyClearing}
+              onClick={() => void handleClearHistory()}
+              className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {historyClearing ? "Clearing..." : "Clear All Chats"}
+            </button>
+          </div>
         </header>
 
         {error ? (
@@ -291,7 +630,7 @@ export default function ChatPage(): JSX.Element {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={2}
-              placeholder="Ask Keeba anything about your profile, plans, or documents..."
+              placeholder="Ask Keeba anything... or type /vault help for secure credential commands"
               className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
             />
           </label>

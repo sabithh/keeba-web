@@ -101,6 +101,21 @@ export default function ProfileForm({ profile, onSave, saving }: ProfileFormProp
         />
       </label>
 
+      <label className="mt-3 block text-sm">
+        <span className="mb-1 block text-xs uppercase tracking-[1.2px] text-keeba-textMuted">Custom Instructions</span>
+        <p className="mb-2 text-xs text-keeba-textMuted">
+          Example: Keep responses short, conversational, and encouraging.
+        </p>
+        <textarea
+          value={formState.custom_instructions ?? ""}
+          onChange={(event) => updateField("custom_instructions", event.target.value)}
+          rows={5}
+          maxLength={2000}
+          placeholder="Add your preferred response style and tone..."
+          className="w-full rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+        />
+      </label>
+
       <div className="mt-4 flex justify-end">
         <button
           type="submit"

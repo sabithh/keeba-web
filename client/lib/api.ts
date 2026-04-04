@@ -15,6 +15,7 @@ export interface Profile {
   address: string | null;
   occupation: string | null;
   about_me: string | null;
+  custom_instructions: string | null;
   updated_at?: string;
 }
 
@@ -40,11 +41,34 @@ export interface DocumentRecord {
   user_id: string;
   name: string;
   type: "aadhaar" | "passport" | "license" | "certificate" | "photo" | "other";
+  custom_type: string | null;
   file_url: string;
   storage_bucket: string;
   storage_path: string;
   extracted_text: string | null;
   created_at: string;
+}
+
+export interface VaultItemRecord {
+  id: number;
+  user_id: string;
+  encrypted_payload: string;
+  iv: string;
+  salt: string;
+  kdf_algorithm: string;
+  kdf_iterations: number;
+  key_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VaultItemInsert {
+  encrypted_payload: string;
+  iv: string;
+  salt: string;
+  kdf_algorithm: string;
+  kdf_iterations: number;
+  key_version: number;
 }
 
 function normalizeProfile(profile: Profile): Profile {
@@ -56,6 +80,7 @@ function normalizeProfile(profile: Profile): Profile {
     address: profile.address || "",
     occupation: profile.occupation || "",
     about_me: profile.about_me || "",
+    custom_instructions: profile.custom_instructions || "",
   };
 }
 
@@ -102,7 +127,7 @@ export async function getProfile(): Promise<Profile | null> {
   const userId = await getRequiredUserId();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, user_id, full_name, date_of_birth, phone, address, occupation, about_me, updated_at")
+    .select("id, user_id, full_name, date_of_birth, phone, address, occupation, about_me, custom_instructions, updated_at")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -115,6 +140,8 @@ export async function getProfile(): Promise<Profile | null> {
 
 export async function updateProfile(payload: Profile): Promise<Profile> {
   const userId = await getRequiredUserId();
+  const normalizedCustomInstructions = (payload.custom_instructions ?? "").trim().slice(0, 2000);
+
   const { data, error } = await supabase
     .from("profiles")
     .upsert(
@@ -126,10 +153,11 @@ export async function updateProfile(payload: Profile): Promise<Profile> {
         address: payload.address || null,
         occupation: payload.occupation || null,
         about_me: payload.about_me || null,
+        custom_instructions: normalizedCustomInstructions || null,
       },
       { onConflict: "user_id" }
     )
-    .select("id, user_id, full_name, date_of_birth, phone, address, occupation, about_me, updated_at")
+    .select("id, user_id, full_name, date_of_birth, phone, address, occupation, about_me, custom_instructions, updated_at")
     .single();
 
   if (error) {
@@ -229,7 +257,7 @@ export async function getFiles(): Promise<DocumentRecord[]> {
   const userId = await getRequiredUserId();
   const { data, error } = await supabase
     .from("documents")
-    .select("id, user_id, name, type, file_url, storage_bucket, storage_path, extracted_text, created_at")
+    .select("id, user_id, name, type, custom_type, file_url, storage_bucket, storage_path, extracted_text, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -246,9 +274,16 @@ function sanitizeFilename(filename: string): string {
 
 export async function uploadFile(
   file: File,
-  type: DocumentRecord["type"]
+  type: DocumentRecord["type"],
+  customType?: string
 ): Promise<DocumentRecord> {
   const userId = await getRequiredUserId();
+  const normalizedCustomType = (customType ?? "").trim().slice(0, 60);
+
+  if (type === "other" && !normalizedCustomType) {
+    throw new Error("Please enter a custom document type");
+  }
+
   const filePath = `${userId}/${Date.now()}-${sanitizeFilename(file.name)}`;
 
   const { error: uploadError } = await supabase.storage.from("keeba-files").upload(filePath, file, {
@@ -289,12 +324,13 @@ export async function uploadFile(
       user_id: userId,
       name: file.name,
       type,
+      custom_type: type === "other" ? normalizedCustomType : null,
       file_url: publicUrl,
       storage_bucket: "keeba-files",
       storage_path: filePath,
       extracted_text: extractedText || null,
     })
-    .select("id, user_id, name, type, file_url, storage_bucket, storage_path, extracted_text, created_at")
+    .select("id, user_id, name, type, custom_type, file_url, storage_bucket, storage_path, extracted_text, created_at")
     .single();
 
   if (error) {
@@ -338,6 +374,58 @@ export async function deleteFile(documentId: number): Promise<void> {
 
   if (deleteError) {
     throw new Error(deleteError.message);
+  }
+}
+
+export async function getVaultItems(): Promise<VaultItemRecord[]> {
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from("vault_items")
+    .select("id, user_id, encrypted_payload, iv, salt, kdf_algorithm, kdf_iterations, key_version, created_at, updated_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as VaultItemRecord[];
+}
+
+export async function createVaultItem(payload: VaultItemInsert): Promise<VaultItemRecord> {
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from("vault_items")
+    .insert({
+      user_id: userId,
+      encrypted_payload: payload.encrypted_payload,
+      iv: payload.iv,
+      salt: payload.salt,
+      kdf_algorithm: payload.kdf_algorithm,
+      kdf_iterations: payload.kdf_iterations,
+      key_version: payload.key_version,
+    })
+    .select("id, user_id, encrypted_payload, iv, salt, kdf_algorithm, kdf_iterations, key_version, created_at, updated_at")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as VaultItemRecord;
+}
+
+export async function deleteVaultItem(vaultItemId: number): Promise<void> {
+  const userId = await getRequiredUserId();
+  const { error } = await supabase
+    .from("vault_items")
+    .delete()
+    .eq("id", vaultItemId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
   }
 }
 

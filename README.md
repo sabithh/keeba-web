@@ -9,6 +9,7 @@ Keeba is a personal AI web app with profile memory, document storage, and contex
   - Postgres (data)
   - Auth (email/password sessions)
   - Storage (documents)
+  - Secure Vault (encrypted credentials)
   - Edge Functions (`chat-message`, `extract-document-text`)
 - AI: Anthropic Claude (`claude-sonnet-4-6`)
 
@@ -18,11 +19,13 @@ Keeba is a personal AI web app with profile memory, document storage, and contex
 /keeba
   /client
     /app
+      /vault
     /components
     /lib
       api.ts
       auth.ts
       supabase.ts
+      vaultCrypto.ts
   /supabase
     schema.sql
     /functions
@@ -47,8 +50,8 @@ Keeba is a personal AI web app with profile memory, document storage, and contex
 Install and login with Supabase CLI, then deploy:
 
 ```bash
-supabase functions deploy chat-message
-supabase functions deploy extract-document-text
+supabase functions deploy chat-message --no-verify-jwt --project-ref your-project-ref
+supabase functions deploy extract-document-text --no-verify-jwt --project-ref your-project-ref
 ```
 
 Set Claude key for function runtime:
@@ -59,8 +62,28 @@ supabase secrets set ANTHROPIC_API_KEY=your_anthropic_key
 
 Function notes:
 
-- `chat-message`: loads user profile, documents, and recent chat history; streams Claude response; stores messages.
+- `chat-message`: loads user profile (including custom instructions), documents, and recent chat history; streams Claude response; stores messages.
 - `extract-document-text`: extracts text from text files directly and uses Claude extraction for image/PDF when key is set.
+
+## Secure Vault
+
+Keeba includes a zero-plaintext vault flow for credentials:
+
+- Secrets are encrypted in the browser (AES-256-GCM) before DB insert.
+- DB stores ciphertext + IV + salt + KDF metadata only.
+- Vault passphrase is never stored on the server.
+- RLS enforces per-user ownership.
+
+You can use either:
+
+- Vault page: `/vault`
+- Chat commands (handled locally, not sent to LLM):
+  - `/vault help`
+  - `/vault list`
+  - `/vault save <service> | <username> | <password> | [optional notes]`
+  - `/vault show <id>`
+  - `/vault reveal <id>`
+  - `/vault delete <id>`
 
 ## 3. Configure Frontend Env (Vercel)
 
@@ -130,8 +153,10 @@ Use `client/.env.local.example` as the template for `client/.env.local`.
 
 ## Core Data Tables
 
-- `profiles`
+- `profiles` (includes `custom_instructions`)
+- `chat_threads`
 - `chat_messages`
-- `documents`
+- `documents` (supports `type = other` with `custom_type`)
+- `vault_items` (encrypted credential records)
 
 All are protected with RLS and mapped to `auth.uid()` ownership.

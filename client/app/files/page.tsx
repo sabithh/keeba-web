@@ -42,13 +42,14 @@ export default function FilesPage(): JSX.Element {
 
   async function handleUpload(
     file: File,
-    type: DocumentRecord["type"]
+    type: DocumentRecord["type"],
+    customType?: string
   ): Promise<void> {
     setUploading(true);
     setError(null);
 
     try {
-      const created = await uploadFile(file, type);
+      const created = await uploadFile(file, type, customType);
       setFiles((current) => [created, ...current]);
     } catch (requestError: unknown) {
       setError(requestError instanceof Error ? requestError.message : "Failed to upload file");
@@ -109,7 +110,9 @@ export default function FilesPage(): JSX.Element {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-keeba-accentLight">{file.name}</p>
-                      <p className="text-xs uppercase tracking-[1.3px] text-keeba-textMuted">{file.type}</p>
+                      <p className="text-xs uppercase tracking-[1.3px] text-keeba-textMuted">
+                        {file.type === "other" && file.custom_type ? file.custom_type : file.type}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <a

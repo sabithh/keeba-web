@@ -9,6 +9,7 @@ interface ProfileRow {
   address: string | null;
   occupation: string | null;
   about_me: string | null;
+  custom_instructions: string | null;
 }
 
 interface ChatMessageRow {
@@ -19,6 +20,7 @@ interface ChatMessageRow {
 interface DocumentRow {
   name: string;
   type: string;
+  custom_type: string | null;
   extracted_text: string | null;
 }
 
@@ -32,6 +34,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Expose-Headers": "x-thread-id",
 };
+
+const MAX_CUSTOM_INSTRUCTIONS_CHARS = 1200;
+const MAX_DOCUMENT_TEXT_CHARS = 2200;
+const MAX_DOCUMENT_NAME_CHARS = 120;
+const MAX_DOCUMENTS_IN_PROMPT = 8;
+const MAX_HISTORY_MESSAGE_CHARS = 2000;
+
+function truncateText(value: string | null | undefined, maxChars: number): string {
+  const normalized = String(value ?? "").trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.length > maxChars ? `${normalized.slice(0, maxChars)}...` : normalized;
+}
 
 function jsonError(message: string, status = 400): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -51,7 +69,13 @@ function buildSystemPrompt(profile: ProfileRow | null, documents: DocumentRow[])
     address: null,
     occupation: null,
     about_me: null,
+    custom_instructions: null,
   };
+
+  const customInstructions = truncateText(
+    effectiveProfile.custom_instructions,
+    MAX_CUSTOM_INSTRUCTIONS_CHARS
+  );
 
   return `
 You are Keeba, a personal AI assistant exclusively for ${effectiveProfile.full_name ?? "User"}.
@@ -65,19 +89,30 @@ Personal details:
 - Occupation: ${effectiveProfile.occupation ?? "Unknown"}
 - About: ${effectiveProfile.about_me ?? "Unknown"}
 
+Custom response instructions from user:
+${customInstructions || "No custom instructions provided."}
+
 Their uploaded documents:
 ${
   documents.length
     ? documents
         .map(
-          (document) =>
-            `[${document.type.toUpperCase()}] ${document.name}:\n${document.extracted_text ?? "No extracted text available."}`
+          (document) => {
+            const documentType = document.type === "other" ? document.custom_type || document.type : document.type;
+            const displayName = truncateText(document.name, MAX_DOCUMENT_NAME_CHARS) || "Untitled document";
+            const extractedText = truncateText(document.extracted_text, MAX_DOCUMENT_TEXT_CHARS);
+
+            return `[${documentType.toUpperCase()}] ${displayName}:\n${extractedText || "No extracted text available."}`;
+          }
         )
         .join("\n\n")
     : "No uploaded documents yet."
 }
 
 Always respond as a warm, intelligent personal assistant.
+Follow the custom response instructions unless they conflict with safety rules.
+Never ask users to share passwords, OTPs, or full card details in normal chat.
+If users ask to store credentials, instruct them to use the Secure Vault page or /vault commands.
 Never expose full Aadhaar or passport numbers unless explicitly asked.
 If asked about documents, refer to the extracted content above.
 `.trim();
@@ -180,7 +215,7 @@ serve(async (req) => {
       return jsonError("Thread not found", 404);
     }
   } else {
-    const threadTitle = content.slice(0, 60) || "New chat";
+    const threadTitle = content.replace(/\s+/g, " ").trim().slice(0, 60) || "New chat";
     const createdThreadResult = await supabase
       .from("chat_threads")
       .insert({
@@ -204,7 +239,7 @@ serve(async (req) => {
   const [profileResult, historyResult, documentsResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, date_of_birth, phone, address, occupation, about_me")
+      .select("full_name, date_of_birth, phone, address, occupation, about_me, custom_instructions")
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase
@@ -216,9 +251,10 @@ serve(async (req) => {
       .limit(20),
     supabase
       .from("documents")
-      .select("name, type, extracted_text")
+      .select("name, type, custom_type, extracted_text")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(MAX_DOCUMENTS_IN_PROMPT),
   ]);
 
   if (profileResult.error || historyResult.error || documentsResult.error) {
@@ -255,7 +291,7 @@ serve(async (req) => {
       messages: [
         ...history.map((message) => ({
           role: message.role,
-          content: message.content,
+          content: truncateText(message.content, MAX_HISTORY_MESSAGE_CHARS),
         })),
         { role: "user", content },
       ],

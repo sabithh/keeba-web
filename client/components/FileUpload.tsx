@@ -6,7 +6,7 @@ import type { DocumentRecord } from "@/lib/api";
 type DocType = DocumentRecord["type"];
 
 interface FileUploadProps {
-  onUpload: (file: File, type: DocType) => Promise<void>;
+  onUpload: (file: File, type: DocType, customType?: string) => Promise<void>;
   uploading: boolean;
 }
 
@@ -22,8 +22,13 @@ const options: DocType[] = [
 export default function FileUpload({ onUpload, uploading }: FileUploadProps): JSX.Element {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState<DocType>("other");
+  const [customType, setCustomType] = useState("");
 
-  const submitDisabled = useMemo(() => uploading || !selectedFile, [uploading, selectedFile]);
+  const requiresCustomType = docType === "other";
+  const submitDisabled = useMemo(
+    () => uploading || !selectedFile || (requiresCustomType && !customType.trim()),
+    [customType, requiresCustomType, selectedFile, uploading]
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -32,8 +37,9 @@ export default function FileUpload({ onUpload, uploading }: FileUploadProps): JS
       return;
     }
 
-    await onUpload(selectedFile, docType);
+    await onUpload(selectedFile, docType, requiresCustomType ? customType.trim() : undefined);
     setSelectedFile(null);
+    setCustomType("");
   }
 
   return (
@@ -43,7 +49,7 @@ export default function FileUpload({ onUpload, uploading }: FileUploadProps): JS
         Supported: image files and PDFs. OCR runs automatically after upload.
       </p>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_160px_120px]">
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_170px_1fr_120px]">
         <label className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm">
           <span className="mb-2 block text-xs uppercase tracking-[1.3px] text-keeba-textMuted">
             File
@@ -65,7 +71,14 @@ export default function FileUpload({ onUpload, uploading }: FileUploadProps): JS
           </span>
           <select
             value={docType}
-            onChange={(event) => setDocType(event.target.value as DocType)}
+            onChange={(event) => {
+              const nextType = event.target.value as DocType;
+              setDocType(nextType);
+
+              if (nextType !== "other") {
+                setCustomType("");
+              }
+            }}
             className="w-full rounded-item border border-keeba-border bg-keeba-card px-2 py-1 text-sm text-keeba-textPrimary"
           >
             {options.map((option) => (
@@ -74,6 +87,21 @@ export default function FileUpload({ onUpload, uploading }: FileUploadProps): JS
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm">
+          <span className="mb-2 block text-xs uppercase tracking-[1.3px] text-keeba-textMuted">
+            Custom Type
+          </span>
+          <input
+            type="text"
+            value={customType}
+            onChange={(event) => setCustomType(event.target.value)}
+            disabled={!requiresCustomType}
+            maxLength={60}
+            placeholder={requiresCustomType ? "e.g. PAN card" : "Select 'other' to enable"}
+            className="w-full rounded-item border border-keeba-border bg-keeba-card px-2 py-1 text-sm text-keeba-textPrimary disabled:cursor-not-allowed disabled:opacity-60"
+          />
         </label>
 
         <button
