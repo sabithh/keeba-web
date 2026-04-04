@@ -543,8 +543,8 @@ export default function ChatPage(): JSX.Element {
         loadingThreads={threadsLoading}
       />
 
-      <section className="mx-auto max-w-6xl px-4 pb-6 pt-4 md:ml-[230px] md:px-7 md:pt-6">
-        <header className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
+      <section className="mx-auto max-w-6xl px-4 pb-20 pt-3 md:ml-[230px] md:px-7 md:pb-6 md:pt-6">
+        <header className="surface-card grid gap-3 p-4 md:grid-cols-[1fr_minmax(320px,420px)] md:items-start">
           <div>
             <h1 className="text-xl font-semibold text-keeba-accentLight">Conversations</h1>
             <p className="text-sm text-keeba-textMuted">
@@ -554,9 +554,9 @@ export default function ChatPage(): JSX.Element {
             </p>
           </div>
 
-          <div className="flex min-w-[260px] flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <label className="text-xs uppercase tracking-[1.3px] text-keeba-textMuted">Vault Passphrase (Local)</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 min-[420px]:flex-row">
               <input
                 type="password"
                 minLength={12}
@@ -568,7 +568,7 @@ export default function ChatPage(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setVaultPassphrase("")}
-                className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+                className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm min-[420px]:w-auto"
               >
                 Clear
               </button>
@@ -578,7 +578,7 @@ export default function ChatPage(): JSX.Element {
               type="button"
               disabled={historyClearing}
               onClick={() => void handleClearHistory()}
-              className="rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textPrimary hover:bg-keeba-card disabled:cursor-not-allowed disabled:opacity-60"
             >
               {historyClearing ? "Clearing..." : "Clear All Chats"}
             </button>
@@ -589,7 +589,7 @@ export default function ChatPage(): JSX.Element {
           <p className="mt-4 rounded-item border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>
         ) : null}
 
-        <div className="surface-card mt-4 h-[60vh] overflow-y-auto p-4 md:p-5">
+        <div className="surface-card mt-4 h-[56dvh] overflow-y-auto p-4 md:h-[60vh] md:p-5">
           {loading ? (
             <div className="space-y-3">
               <div className="skeleton h-20 w-2/3" />
@@ -623,13 +623,13 @@ export default function ChatPage(): JSX.Element {
           )}
         </div>
 
-        <form onSubmit={handleSend} className="surface-card mt-4 flex items-end gap-3 p-3 md:p-4">
+        <form onSubmit={handleSend} className="surface-card mt-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-end md:p-4">
           <label className="flex-1">
             <span className="sr-only">Message Keeba</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Ask Keeba anything... or type /vault help for secure credential commands"
               className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
             />
@@ -637,7 +637,7 @@ export default function ChatPage(): JSX.Element {
           <button
             type="submit"
             disabled={sending}
-            className="rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {sending ? "Sending..." : "Send"}
           </button>

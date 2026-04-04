@@ -116,11 +116,11 @@ export default function ProfileForm({ profile, onSave, saving }: ProfileFormProp
         />
       </label>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex">
         <button
           type="submit"
           disabled={saving}
-          className="rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2.5 text-sm font-semibold text-keeba-surface disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto sm:w-auto"
         >
           {saving ? "Saving..." : "Save Profile"}
         </button>

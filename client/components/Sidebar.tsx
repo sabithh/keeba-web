@@ -63,7 +63,7 @@ export default function Sidebar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-keeba-border bg-keeba-surface/95 px-4 py-3 backdrop-blur md:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-keeba-border bg-keeba-surface/95 px-3 py-2.5 backdrop-blur md:hidden">
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
@@ -71,8 +71,15 @@ export default function Sidebar({
         >
           Menu
         </button>
-        <p className="keeba-logo text-xl">keeba</p>
-        <span className="text-xs uppercase tracking-[2px] text-keeba-textMuted">{title}</span>
+        <div className="flex items-center gap-2">
+          <img
+            src="/icon.svg"
+            alt="Keeba icon"
+            className="h-7 w-7 rounded-[8px] border border-keeba-borderAccent bg-keeba-primary p-0.5"
+          />
+          <p className="keeba-logo text-lg leading-none">keeba</p>
+        </div>
+        <span className="hidden text-[10px] uppercase tracking-[1.8px] text-keeba-textMuted min-[380px]:block">{title}</span>
       </header>
 
       {isOpen ? (
@@ -85,13 +92,20 @@ export default function Sidebar({
       ) : null}
 
       <aside
-        className={`fixed left-0 top-0 z-30 flex h-screen w-[230px] flex-col border-r border-keeba-border bg-keeba-surface px-4 py-5 transition-transform duration-300 md:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex h-[100dvh] w-[86vw] max-w-[290px] flex-col border-r border-keeba-border bg-keeba-surface px-4 py-5 transition-transform duration-300 md:w-[230px] md:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="border-b border-keeba-border pb-4">
-          <p className="keeba-logo text-[30px] leading-none">keeba</p>
-          <p className="mt-2 text-xs uppercase tracking-[2px] text-keeba-textMuted">personal ai</p>
+        <div className="flex items-center gap-3 border-b border-keeba-border pb-4">
+          <img
+            src="/icon.svg"
+            alt="Keeba icon"
+            className="h-10 w-10 rounded-[10px] border border-keeba-borderAccent bg-keeba-primary p-1"
+          />
+          <div>
+            <p className="keeba-logo text-[26px] leading-none">keeba</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[1.9px] text-keeba-textMuted">personal ai</p>
+          </div>
         </div>
 
         <nav className="mt-6 flex flex-col gap-2">

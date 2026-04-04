@@ -45,12 +45,22 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-6 sm:py-10">
       <div className="pointer-events-none absolute -left-20 top-6 h-56 w-56 rounded-full bg-[#94897933] blur-3xl" />
       <div className="pointer-events-none absolute bottom-6 right-0 h-64 w-64 rounded-full bg-[#393E4630] blur-3xl" />
 
-      <section className="surface-card w-full max-w-md p-7 md:p-8">
-        <p className="keeba-logo text-4xl leading-none">keeba</p>
+      <section className="surface-card w-full max-w-md p-6 md:p-8">
+        <div className="flex items-center gap-3">
+          <img
+            src="/icon.svg"
+            alt="Keeba icon"
+            className="h-12 w-12 rounded-[11px] border border-keeba-borderAccent bg-keeba-primary p-1"
+          />
+          <div>
+            <p className="keeba-logo text-4xl leading-none">keeba</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[1.8px] text-keeba-textMuted">personal ai</p>
+          </div>
+        </div>
         <p className="mt-2 text-sm text-keeba-textMuted">Your personal AI companion with memory and document context.</p>
 
         <div className="mt-5 flex rounded-item border border-keeba-border bg-keeba-primary p-1">
@@ -82,7 +92,7 @@ export default function LoginPage(): JSX.Element {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2.5 text-sm"
             />
           </label>
 
@@ -94,7 +104,7 @@ export default function LoginPage(): JSX.Element {
               minLength={8}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2.5 text-sm"
             />
           </label>
 
@@ -105,7 +115,7 @@ export default function LoginPage(): JSX.Element {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2.5 text-sm font-semibold text-keeba-surface transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Please wait..." : mode === "login" ? "Enter Keeba" : "Create Account"}
           </button>

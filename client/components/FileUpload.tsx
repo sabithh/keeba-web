@@ -107,7 +107,7 @@ export default function FileUpload({ onUpload, uploading }: FileUploadProps): JS
         <button
           type="submit"
           disabled={submitDisabled}
-          className="rounded-item border border-keeba-border bg-keeba-accent px-3 py-2 text-sm font-semibold text-keeba-surface transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-item border border-keeba-border bg-keeba-accent px-3 py-2.5 text-sm font-semibold text-keeba-surface transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
         >
           {uploading ? "Uploading..." : "Upload"}
         </button>

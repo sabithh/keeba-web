@@ -114,19 +114,19 @@ export default function FilesPage(): JSX.Element {
                         {file.type === "other" && file.custom_type ? file.custom_type : file.type}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                       <a
                         href={file.file_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-item border border-keeba-border bg-keeba-card px-3 py-1.5 text-xs"
+                        className="min-w-[74px] rounded-item border border-keeba-border bg-keeba-card px-3 py-2 text-xs text-center"
                       >
                         Open
                       </a>
                       <button
                         type="button"
                         onClick={() => void handleDelete(file.id)}
-                        className="rounded-item border border-keeba-border bg-keeba-card px-3 py-1.5 text-xs text-red-200"
+                        className="min-w-[74px] rounded-item border border-keeba-border bg-keeba-card px-3 py-2 text-xs text-red-200"
                       >
                         Delete
                       </button>

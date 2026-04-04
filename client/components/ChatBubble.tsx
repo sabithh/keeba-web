@@ -16,7 +16,7 @@ export default function ChatBubble({
   return (
     <article className={`fade-in flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[90%] rounded-keeba border px-4 py-3 text-sm md:max-w-[75%] ${
+        className={`max-w-[94%] rounded-keeba border px-4 py-3 text-sm md:max-w-[75%] ${
           isUser
             ? "border-keeba-borderAccent bg-keeba-primary text-keeba-accentLight"
             : "border-keeba-border bg-keeba-card text-keeba-textPrimary"
