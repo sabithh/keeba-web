@@ -17,8 +17,10 @@ interface SidebarProps {
   chatThreads?: ChatThread[];
   activeThreadId?: string | null;
   onSelectThread?: (threadId: string) => void;
+  onDeleteThread?: (threadId: string) => void;
   onNewChat?: () => void;
   loadingThreads?: boolean;
+  deletingThreadId?: string | null;
 }
 
 function formatThreadTime(value: string): string {
@@ -43,8 +45,10 @@ export default function Sidebar({
   chatThreads = [],
   activeThreadId = null,
   onSelectThread,
+  onDeleteThread,
   onNewChat,
   loadingThreads = false,
+  deletingThreadId = null,
 }: SidebarProps): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
@@ -161,24 +165,40 @@ export default function Sidebar({
                 chatThreads.map((thread) => {
                   const active = activeThreadId === thread.id;
                   return (
-                    <button
+                    <div
                       key={thread.id}
-                      type="button"
-                      onClick={() => {
-                        onSelectThread?.(thread.id);
-                        setIsOpen(false);
-                      }}
                       className={`w-full rounded-item border px-3 py-2 text-left transition ${
                         active
                           ? "border-keeba-borderAccent bg-keeba-primary text-keeba-accentLight"
                           : "border-keeba-border bg-transparent text-keeba-textPrimary hover:bg-keeba-card"
                       }`}
                     >
-                      <p className="truncate text-sm font-medium">{thread.title || "Untitled chat"}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[1.5px] text-keeba-textMuted">
-                        {formatThreadTime(thread.last_message_at)}
-                      </p>
-                    </button>
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectThread?.(thread.id);
+                            setIsOpen(false);
+                          }}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate text-sm font-medium">{thread.title || "Untitled chat"}</p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[1.5px] text-keeba-textMuted">
+                            {formatThreadTime(thread.last_message_at)}
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onDeleteThread?.(thread.id)}
+                          disabled={deletingThreadId === thread.id}
+                          className="rounded-item border border-keeba-border bg-keeba-card px-2 py-1 text-[10px] uppercase tracking-[1px] text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label={`Delete chat ${thread.title || thread.id}`}
+                        >
+                          {deletingThreadId === thread.id ? "..." : "Del"}
+                        </button>
+                      </div>
+                    </div>
                   );
                 })
               )}

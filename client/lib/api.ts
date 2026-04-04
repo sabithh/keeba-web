@@ -223,6 +223,19 @@ export async function clearChatHistory(): Promise<void> {
   }
 }
 
+export async function deleteChatThread(threadId: string): Promise<void> {
+  const userId = await getRequiredUserId();
+  const { error } = await supabase
+    .from("chat_threads")
+    .delete()
+    .eq("id", threadId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 async function parseError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as {

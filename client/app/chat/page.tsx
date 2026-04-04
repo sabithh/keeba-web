@@ -8,6 +8,7 @@ import {
   ChatMessage,
   clearChatHistory,
   createVaultItem,
+  deleteChatThread,
   deleteVaultItem,
   getChatHistory,
   getChatThreads,
@@ -172,6 +173,7 @@ export default function ChatPage(): JSX.Element {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyClearing, setHistoryClearing] = useState(false);
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -203,10 +205,6 @@ export default function ChatPage(): JSX.Element {
 
       if (nextActiveThreadId && !nextThreads.some((thread) => thread.id === nextActiveThreadId)) {
         nextActiveThreadId = null;
-      }
-
-      if (!nextActiveThreadId && nextThreads.length > 0) {
-        nextActiveThreadId = nextThreads[0].id;
       }
 
       setActiveThreadId(nextActiveThreadId);
@@ -558,6 +556,25 @@ export default function ChatPage(): JSX.Element {
     await loadHistory(threadId);
   }
 
+  async function handleDeleteThread(threadId: string): Promise<void> {
+    setDeletingThreadId(threadId);
+    setError(null);
+
+    try {
+      await deleteChatThread(threadId);
+      setThreads((current) => current.filter((thread) => thread.id !== threadId));
+
+      if (activeThreadId === threadId) {
+        setActiveThreadId(null);
+        setMessages([]);
+      }
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to delete chat thread");
+    } finally {
+      setDeletingThreadId(null);
+    }
+  }
+
   function handleNewChat(): void {
     setActiveThreadId(null);
     setMessages([]);
@@ -572,8 +589,12 @@ export default function ChatPage(): JSX.Element {
         onSelectThread={(threadId) => {
           void handleSelectThread(threadId);
         }}
+        onDeleteThread={(threadId) => {
+          void handleDeleteThread(threadId);
+        }}
         onNewChat={handleNewChat}
         loadingThreads={threadsLoading}
+        deletingThreadId={deletingThreadId}
       />
 
       <section className="mx-auto max-w-6xl px-4 pb-20 pt-3 md:ml-[230px] md:px-7 md:pb-6 md:pt-6">
@@ -615,8 +636,8 @@ export default function ChatPage(): JSX.Element {
                 <p className="keeba-logo text-3xl">keeba</p>
                 <p className="mt-2 text-sm text-keeba-textMuted">
                   {activeThreadId
-                    ? "This chat is empty. Ask anything to begin."
-                    : "No chat selected. Click New Chat in the sidebar to start."}
+                    ? "This chat is empty. Type your message to start."
+                    : "No chat selected. Type your message to start a new chat."}
                 </p>
               </div>
             </div>
@@ -643,7 +664,7 @@ export default function ChatPage(): JSX.Element {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={3}
-              placeholder="Ask Keeba anything... or type /vault help for secure credential commands"
+              placeholder="Type your doubt or message..."
               className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
             />
           </label>

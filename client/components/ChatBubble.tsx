@@ -1,3 +1,6 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 interface ChatBubbleProps {
   role: "user" | "assistant";
   content: string;
@@ -25,7 +28,13 @@ export default function ChatBubble({
         <p className="mb-1 text-[11px] uppercase tracking-[1.7px] text-keeba-textMuted">
           {isUser ? "You" : "Keeba"}
         </p>
-        <p className="whitespace-pre-wrap leading-relaxed">{content || (streaming ? "..." : "")}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap leading-relaxed">{content || (streaming ? "..." : "")}</p>
+        ) : (
+          <div className="chat-markdown leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || (streaming ? "..." : "")}</ReactMarkdown>
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between gap-3">
           {createdAt ? (
             <span className="text-[10px] uppercase tracking-[1.5px] text-keeba-textDim">

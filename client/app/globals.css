@@ -105,6 +105,56 @@ a {
   animation-delay: 0.3s;
 }
 
+.chat-markdown p {
+  margin: 0.4rem 0;
+}
+
+.chat-markdown p:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  margin: 0.45rem 0;
+  padding-left: 1.1rem;
+}
+
+.chat-markdown li {
+  margin: 0.15rem 0;
+}
+
+.chat-markdown code {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(28, 32, 40, 0.85);
+  padding: 0.08rem 0.35rem;
+  font-size: 0.84em;
+}
+
+.chat-markdown pre {
+  margin: 0.55rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(28, 32, 40, 0.95);
+  padding: 0.65rem 0.7rem;
+  overflow-x: auto;
+}
+
+.chat-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.chat-markdown a {
+  color: var(--accent-light);
+  text-decoration: underline;
+}
+
 @keyframes skeleton-shimmer {
   to {
     background-position-x: -200%;
