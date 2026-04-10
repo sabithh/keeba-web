@@ -21,30 +21,6 @@ export const metadata: Metadata = {
   description: "Keeba personal AI assistant",
   applicationName: "Keeba",
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: [
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-      {
-        url: "/app-icon/192",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        url: "/app-icon/512",
-        sizes: "512x512",
-        type: "image/png",
-      },
-    ],
-    shortcut: [
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-  },
   appleWebApp: {
     capable: true,
     title: "Keeba",
