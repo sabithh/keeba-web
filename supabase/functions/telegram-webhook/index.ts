@@ -183,6 +183,11 @@ Never ask users to share passwords, OTPs, or full card details in normal chat.
 If users ask to store credentials, instruct them to use the Secure Vault page or /vault commands.
 Never expose full Aadhaar or passport numbers unless explicitly asked.
 If asked about documents, refer to the extracted content above.
+
+To set a reminder for the user, output exactly this xml tag anywhere in your response:
+<SET_REMINDER task='[What to remind them]' time='[ISO 8601 UTC string]' />
+Example: <SET_REMINDER task='Buy milk' time='2026-04-11T09:00:00Z' />
+Keeba's background system will parse this tag and schedule the Telegram reminder.
 `.trim();
 }
 
@@ -316,6 +321,16 @@ async function generateAssistantReply(
   const assistantReply =
     extractAssistantText(anthropicPayload) ||
     "I am here and ready to help. Could you share a bit more detail?";
+
+  const reminderRegex = /<SET_REMINDER task='(.*?)' time='(.*?)'\s*\/>/g;
+  let match;
+  while ((match = reminderRegex.exec(assistantReply)) !== null) {
+    await serviceClient.from("reminders").insert({
+      user_id: userId,
+      task: match[1],
+      due_at: match[2],
+    });
+  }
 
   const assistantInsert = await serviceClient.from("chat_messages").insert({
     user_id: userId,

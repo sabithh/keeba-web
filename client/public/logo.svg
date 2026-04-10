@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="28" fill="#1c2028"/>
+  <rect x="1" y="1" width="118" height="118" rx="27" fill="none" stroke="#393E46" stroke-width="1"/>
+  <circle cx="60" cy="46" r="18" fill="none" stroke="#948979" stroke-width="2.5"/>
+  <circle cx="60" cy="46" r="7" fill="#948979"/>
+  <path d="M34 82 C34 66 86 66 86 82" fill="none" stroke="#948979" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M44 90 C44 80 76 80 76 90" fill="none" stroke="#DFD0B8" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <text x="60" y="108" font-family="'Playfair Display', serif" font-size="11" font-weight="600" fill="#DFD0B8" text-anchor="middle" letter-spacing="3">keeba</text>
+</svg>
