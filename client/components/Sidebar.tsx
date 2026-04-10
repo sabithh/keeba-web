@@ -8,6 +8,7 @@ import { signOut } from "@/lib/auth";
 
 const navItems = [
   { href: "/chat", label: "Chat" },
+  { href: "/journal", label: "Journal" },
   { href: "/vault", label: "Vault" },
   { href: "/files", label: "Files" },
   { href: "/settings", label: "Settings" },

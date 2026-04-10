@@ -564,3 +564,98 @@ export async function createTelegramLinkCode(): Promise<TelegramLinkCode> {
     deep_link: response.deep_link ? String(response.deep_link) : null,
   };
 }
+
+export interface JournalThread {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JournalEntry {
+  id: number;
+  journal_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+}
+
+export async function getJournalThreads(): Promise<JournalThread[]> {
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from('journal_threads')
+    .select('id, user_id, title, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as JournalThread[];
+}
+
+export async function getJournalEntries(journalId: string | null): Promise<JournalEntry[]> {
+  if (!journalId) return [];
+
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .select('id, journal_id, user_id, content, created_at')
+    .eq('user_id', userId)
+    .eq('journal_id', journalId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as JournalEntry[];
+}
+
+export async function createJournalThread(title: string): Promise<JournalThread> {
+  const userId = await getRequiredUserId();
+  const { data, error } = await supabase
+    .from('journal_threads')
+    .insert([{ user_id: userId, title }])
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as JournalThread;
+}
+
+export async function addJournalEntry(journalId: string | null, content: string): Promise<{ entry: JournalEntry; threadId: string }> {
+  let threadId = journalId;
+  const userId = await getRequiredUserId();
+
+  if (!threadId) {
+    const titleMatch = content.split('\n')[0].substring(0, 30);
+    const newThread = await createJournalThread(titleMatch || 'New Journal');
+    threadId = newThread.id;
+  }
+
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .insert([{ journal_id: threadId, user_id: userId, content }])
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  await supabase
+    .from('journal_threads')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', threadId)
+    .eq('user_id', userId);
+
+  return { entry: data as JournalEntry, threadId };
+}
+
+export async function deleteJournalThread(journalId: string): Promise<void> {
+  const userId = await getRequiredUserId();
+  const { error } = await supabase
+    .from('journal_threads')
+    .delete()
+    .eq('id', journalId)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(error.message);
+}

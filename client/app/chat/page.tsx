@@ -19,6 +19,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { decryptVaultPayload, encryptVaultPayload, VaultSecretPayload } from "@/lib/vaultCrypto";
 import { useRouter } from "next/navigation";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 type UiMessage = ChatMessage & { streaming?: boolean; id: number };
 
@@ -175,6 +176,10 @@ export default function ChatPage(): JSX.Element {
   const [historyClearing, setHistoryClearing] = useState(false);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  const { isListening, toggleListening, hasSupport } = useSpeechRecognition((transcript) => {
+    setInput((prev) => (prev ? prev + " " + transcript : transcript));
+  });
 
   useEffect(() => {
     void (async () => {
@@ -658,15 +663,30 @@ export default function ChatPage(): JSX.Element {
         </div>
 
         <form onSubmit={handleSend} className="surface-card mt-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-end md:p-4">
-          <label className="flex-1">
+          <label className="flex-1 flex gap-2">
             <span className="sr-only">Message Keeba</span>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={3}
               placeholder="Type your doubt or message..."
-              className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm"
+              className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary flex-1 px-3 py-2 text-sm"
             />
+            {hasSupport && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={"shrink-0 self-end p-2 rounded-full " + (isListening ? "bg-red-500/20 text-red-500" : "bg-keeba-primaryLight text-keeba-textMuted")}
+                title={isListening ? "Stop voice input" : "Start voice input"}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              </button>
+            )}
           </label>
           <button
             type="submit"
