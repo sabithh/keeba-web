@@ -15,7 +15,7 @@ export default function HomePage(): JSX.Element {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <main className="flex min-h-[100dvh] items-center justify-center px-6">
       <div className="surface-card w-full max-w-md p-8 text-center">
         <img
           src="/icon.svg"

@@ -146,9 +146,9 @@ export default function JournalPage(): JSX.Element {
 
   if (!isAuthenticated) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-[100dvh]">
         <Sidebar />
-        <section className="flex flex-col items-center justify-center p-6 md:ml-[230px] min-h-screen">
+        <section className="flex flex-col items-center justify-center p-6 md:ml-[230px] min-h-[100dvh]">
           <div className="surface-card p-6 w-full max-w-sm rounded-[16px]">
             <h2 className="text-xl font-bold text-keeba-accentLight mb-4">Journal Access</h2>
             <p className="text-keeba-textMuted mb-4">Please enter the passcode to access your journal.</p>
@@ -182,7 +182,7 @@ export default function JournalPage(): JSX.Element {
   }
 
   return (
-    <main className="min-h-screen grid-layout">
+    <main className="min-h-[100dvh] grid-layout">
       <Sidebar />
       <aside className="border-r border-keeba-border hidden md:flex md:w-[260px] md:flex-col md:ml-[230px]">
         <div className="p-4 border-b border-keeba-border">

@@ -587,7 +587,7 @@ export default function ChatPage(): JSX.Element {
   }
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-[100dvh]">
       <Sidebar
         chatThreads={threads}
         activeThreadId={activeThreadId}

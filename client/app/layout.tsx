@@ -57,11 +57,16 @@ export const metadata: Metadata = {
     title: "Keeba",
     statusBarStyle: "black-translucent",
   },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1, // Prevents iOS input inner zoom
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#1c2028",
 };
