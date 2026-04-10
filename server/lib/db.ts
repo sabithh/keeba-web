@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS documents (
   extracted_text TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS whatsapp_inbound_messages (
+  id SERIAL PRIMARY KEY,
+  wa_message_id TEXT UNIQUE NOT NULL,
+  user_phone TEXT NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  received_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_whatsapp_inbound_user_received_at
+  ON whatsapp_inbound_messages (user_id, received_at DESC);
 `;
 
 export async function initDb(): Promise<void> {

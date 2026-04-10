@@ -10,7 +10,7 @@ Keeba is a personal AI web app with profile memory, document storage, and contex
   - Auth (email/password sessions)
   - Storage (documents)
   - Secure Vault (encrypted credentials)
-  - Edge Functions (`chat-message`, `extract-document-text`)
+  - Edge Functions (`chat-message`, `extract-document-text`, `telegram-link-code`, `telegram-webhook`)
 - AI: Anthropic Claude (`claude-sonnet-4-6`)
 
 ## Project Layout
@@ -33,6 +33,10 @@ Keeba is a personal AI web app with profile memory, document storage, and contex
         index.ts
       /extract-document-text
         index.ts
+      /telegram-link-code
+        index.ts
+      /telegram-webhook
+        index.ts
   /server               # legacy from previous architecture, not required for deployment
 ```
 
@@ -52,18 +56,41 @@ Install and login with Supabase CLI, then deploy:
 ```bash
 supabase functions deploy chat-message --no-verify-jwt --project-ref your-project-ref
 supabase functions deploy extract-document-text --no-verify-jwt --project-ref your-project-ref
+supabase functions deploy telegram-link-code --no-verify-jwt --project-ref your-project-ref
+supabase functions deploy telegram-webhook --no-verify-jwt --project-ref your-project-ref
 ```
 
 Set Claude key for function runtime:
 
 ```bash
 supabase secrets set ANTHROPIC_API_KEY=your_anthropic_key
+supabase secrets set TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+supabase secrets set TELEGRAM_WEBHOOK_SECRET=your_random_secret
+supabase secrets set TELEGRAM_BOT_USERNAME=your_bot_username_without_at
 ```
 
 Function notes:
 
 - `chat-message`: loads user profile (including custom instructions), documents, and recent chat history; streams Claude response; stores messages.
 - `extract-document-text`: extracts text from text files directly and uses Claude extraction for image/PDF when key is set.
+- `telegram-link-code`: creates one-time linking codes for authenticated users from Settings page.
+- `telegram-webhook`: receives Telegram updates, links chats with `/start <code>`, and returns Keeba responses.
+
+## Telegram Bot Setup (Supabase Only)
+
+1. Create your bot in Telegram using BotFather and keep the bot token safe.
+2. Deploy `telegram-webhook` and set function secrets above.
+3. Register webhook:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -d "url=https://your-project-ref.supabase.co/functions/v1/telegram-webhook" \
+  -d "secret_token=your_random_secret"
+```
+
+4. In Keeba Settings page, generate Telegram link code.
+5. Open bot chat and send `/start YOUR_CODE`.
+6. Send any message to continue chatting with Keeba on Telegram.
 
 ## Secure Vault
 
@@ -130,7 +157,7 @@ Set these GitHub repository secrets:
 - `SUPABASE_ACCESS_TOKEN`
 - `SUPABASE_PROJECT_REF`
 
-After that, any push to `main` that changes files under `supabase/functions/` will auto-deploy both edge functions.
+After that, any push to `main` that changes files under `supabase/functions/` will auto-deploy all configured edge functions.
 
 ## Local Development
 
@@ -158,5 +185,7 @@ Use `client/.env.local.example` as the template for `client/.env.local`.
 - `chat_messages`
 - `documents` (supports `type = other` with `custom_type`)
 - `vault_items` (encrypted credential records)
+- `telegram_link_codes` (short-lived account linking codes)
+- `telegram_inbound_messages` (dedupe/audit for inbound Telegram updates)
 
 All are protected with RLS and mapped to `auth.uid()` ownership.

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileForm from "@/components/ProfileForm";
 import Sidebar from "@/components/Sidebar";
-import { Profile, getProfile, updateProfile } from "@/lib/api";
+import { Profile, TelegramLinkCode, createTelegramLinkCode, getProfile, updateProfile } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 
 const emptyProfile: Profile = {
@@ -22,6 +22,10 @@ export default function SettingsPage(): JSX.Element {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [telegramLink, setTelegramLink] = useState<TelegramLinkCode | null>(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramError, setTelegramError] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +81,50 @@ export default function SettingsPage(): JSX.Element {
     }
   }
 
+  async function handleGenerateTelegramLink(): Promise<void> {
+    setTelegramLoading(true);
+    setTelegramError(null);
+    setCopyMessage(null);
+
+    try {
+      const linkCode = await createTelegramLinkCode();
+      setTelegramLink(linkCode);
+      setMessage("Telegram link code generated.");
+    } catch (requestError: unknown) {
+      setTelegramError(requestError instanceof Error ? requestError.message : "Failed to generate Telegram link code");
+    } finally {
+      setTelegramLoading(false);
+    }
+  }
+
+  async function handleCopyStartCommand(): Promise<void> {
+    if (!telegramLink) {
+      return;
+    }
+
+    if (!navigator?.clipboard) {
+      setCopyMessage("Clipboard is not available in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(`/start ${telegramLink.code}`);
+      setCopyMessage("Copied /start command.");
+    } catch {
+      setCopyMessage("Unable to copy command. Please copy manually.");
+    }
+  }
+
+  function formatTelegramExpiry(value: string): string {
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString();
+  }
+
   return (
     <main className="min-h-screen">
       <Sidebar />
@@ -113,6 +161,77 @@ export default function SettingsPage(): JSX.Element {
             <ProfileForm profile={profile} onSave={handleSave} saving={saving} />
           )}
         </div>
+
+        {!loading ? (
+          <section className="surface-card mt-4 p-5">
+            <h2 className="text-lg font-semibold text-keeba-accentLight">Connect Telegram Bot</h2>
+            <p className="mt-1 text-sm text-keeba-textMuted">
+              Generate a one-time code, then message your bot with /start followed by the code.
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={telegramLoading}
+                onClick={() => {
+                  void handleGenerateTelegramLink();
+                }}
+                className="rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {telegramLoading ? "Generating..." : "Generate Telegram Link Code"}
+              </button>
+
+              <button
+                type="button"
+                disabled={!telegramLink}
+                onClick={() => {
+                  void handleCopyStartCommand();
+                }}
+                className="rounded-item border border-keeba-border bg-keeba-primary px-4 py-2 text-sm font-semibold text-keeba-accentLight disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Copy /start Command
+              </button>
+            </div>
+
+            {telegramError ? (
+              <p className="mt-3 rounded-item border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{telegramError}</p>
+            ) : null}
+
+            {copyMessage ? (
+              <p className="mt-3 rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-textMuted">
+                {copyMessage}
+              </p>
+            ) : null}
+
+            {telegramLink ? (
+              <div className="mt-3 space-y-2 rounded-item border border-keeba-border bg-keeba-primary p-3 text-sm">
+                <p>
+                  <span className="text-keeba-textMuted">Start command:</span> /start {telegramLink.code}
+                </p>
+                <p>
+                  <span className="text-keeba-textMuted">Expires at:</span> {formatTelegramExpiry(telegramLink.expires_at)}
+                </p>
+                {telegramLink.deep_link ? (
+                  <p>
+                    <span className="text-keeba-textMuted">Bot deep link:</span>{" "}
+                    <a
+                      href={telegramLink.deep_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-keeba-accentLight underline"
+                    >
+                      Open Telegram Bot
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-keeba-textMuted">
+                    Add TELEGRAM_BOT_USERNAME in function secrets to receive a clickable deep link here.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </section>
     </main>
   );

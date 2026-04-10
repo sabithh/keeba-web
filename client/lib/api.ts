@@ -71,6 +71,13 @@ export interface VaultItemInsert {
   key_version: number;
 }
 
+export interface TelegramLinkCode {
+  code: string;
+  expires_at: string;
+  bot_username: string | null;
+  deep_link: string | null;
+}
+
 function normalizeProfile(profile: Profile): Profile {
   return {
     ...profile,
@@ -529,4 +536,31 @@ export async function streamChatMessage(
 
     onChunk(decoder.decode(value, { stream: true }));
   }
+}
+
+export async function createTelegramLinkCode(): Promise<TelegramLinkCode> {
+  assertSupabaseConfigured();
+
+  const { data, error } = await supabase.functions.invoke("telegram-link-code", {
+    method: "POST",
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to generate Telegram link code");
+  }
+
+  const response = (data ?? {}) as Partial<TelegramLinkCode>;
+  const code = String(response.code ?? "").trim();
+  const expiresAt = String(response.expires_at ?? "").trim();
+
+  if (!code || !expiresAt) {
+    throw new Error("Invalid Telegram link code response");
+  }
+
+  return {
+    code,
+    expires_at: expiresAt,
+    bot_username: response.bot_username ? String(response.bot_username) : null,
+    deep_link: response.deep_link ? String(response.deep_link) : null,
+  };
 }
