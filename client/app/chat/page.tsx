@@ -520,7 +520,7 @@ export default function ChatPage(): JSX.Element {
       const message = requestError instanceof Error ? requestError.message : "Failed to stream response";
       setError(message);
 
-      if (/please sign in again|session could not be verified/i.test(message)) {
+      if (/sign in again|session could not be verified/i.test(message)) {
         const currentUser = await getCurrentUser();
 
         if (!currentUser) {

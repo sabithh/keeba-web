@@ -460,15 +460,27 @@ export async function streamChatMessage(
 ): Promise<void> {
   const signal = options?.signal;
   const requestedThreadId = options?.threadId ?? null;
+  const hasUsableFunctionsKey = Boolean(supabaseFunctionsKey && !/^placeholder/i.test(supabaseFunctionsKey));
 
-  async function callChatFunction(accessToken: string): Promise<Response> {
+  type ChatAuthMode = "configured-key" | "access-token-key" | "no-key";
+
+  async function callChatFunction(accessToken: string, authMode: ChatAuthMode): Promise<Response> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    };
+
+    if (authMode === "configured-key" && hasUsableFunctionsKey) {
+      headers.apikey = supabaseFunctionsKey;
+    }
+
+    if (authMode === "access-token-key") {
+      headers.apikey = accessToken;
+    }
+
     return fetch(`${supabaseFunctionsBaseUrl}/chat-message`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        apikey: supabaseFunctionsKey,
-      },
+      headers,
       body: JSON.stringify({ content, threadId: requestedThreadId }),
       signal,
     });
@@ -484,14 +496,34 @@ export async function streamChatMessage(
     throw new Error("Session unavailable. Please reopen the app and try again.");
   }
 
-  let response = await callChatFunction(token);
+  let response = await callChatFunction(token, "configured-key");
 
   if (response.status === 401) {
     const refreshedToken = await forceRefreshAccessToken();
 
     if (refreshedToken) {
       token = refreshedToken;
-      response = await callChatFunction(token);
+      response = await callChatFunction(token, "configured-key");
+    }
+  }
+
+  if (!response.ok && response.status === 401) {
+    const unauthorizedMessage = await parseError(response);
+
+    if (/invalid jwt|unauthorized/i.test(unauthorizedMessage)) {
+      response = await callChatFunction(token, "access-token-key");
+    } else {
+      throw new Error("Session could not be verified. Please sign in again.");
+    }
+  }
+
+  if (!response.ok && response.status === 401) {
+    const unauthorizedMessage = await parseError(response);
+
+    if (/invalid jwt|unauthorized/i.test(unauthorizedMessage)) {
+      response = await callChatFunction(token, "no-key");
+    } else {
+      throw new Error("Session could not be verified. Please sign in again.");
     }
   }
 
@@ -499,7 +531,9 @@ export async function streamChatMessage(
     const errorMessage = await parseError(response);
 
     if (response.status === 401) {
-      throw new Error("Session could not be verified. Please sign in again.");
+      throw new Error(
+        "Chat authorization failed. Please refresh and sign in again. If this keeps happening, set NEXT_PUBLIC_SUPABASE_FUNCTIONS_KEY to your Supabase legacy anon key."
+      );
     }
 
     throw new Error(errorMessage);
