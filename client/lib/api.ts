@@ -1,4 +1,4 @@
-import { forceRefreshAccessToken, getAccessToken, getCurrentUser, signOut } from "./auth";
+import { forceRefreshAccessToken, getAccessToken, getCurrentUser } from "./auth";
 import {
   assertSupabaseConfigured,
   supabase,
@@ -477,39 +477,29 @@ export async function streamChatMessage(
   let token = await getAccessToken();
 
   if (!token) {
-    throw new Error("Missing authentication token");
+    token = await forceRefreshAccessToken();
+  }
+
+  if (!token) {
+    throw new Error("Session unavailable. Please reopen the app and try again.");
   }
 
   let response = await callChatFunction(token);
 
-  if (!response.ok) {
-    const firstError = await parseError(response);
+  if (response.status === 401) {
+    const refreshedToken = await forceRefreshAccessToken();
 
-    if (response.status === 401 && /invalid jwt/i.test(firstError)) {
-      const refreshedToken = await forceRefreshAccessToken();
-
-      if (!refreshedToken) {
-        await signOut();
-        throw new Error(
-          "Session expired. Please sign in again."
-        );
-      }
-
+    if (refreshedToken) {
       token = refreshedToken;
       response = await callChatFunction(token);
-    } else {
-      throw new Error(firstError);
     }
   }
 
   if (!response.ok) {
     const errorMessage = await parseError(response);
 
-    if (response.status === 401 && /invalid jwt/i.test(errorMessage)) {
-      await signOut();
-      throw new Error(
-        "Session token invalid. Please sign in again."
-      );
+    if (response.status === 401) {
+      throw new Error("Session could not be verified. Please sign in again.");
     }
 
     throw new Error(errorMessage);
