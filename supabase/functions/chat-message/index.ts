@@ -157,6 +157,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -172,22 +173,29 @@ serve(async (req) => {
     return jsonError("Missing authorization token", 401);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
-  });
+  const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!accessToken) {
+    return jsonError("Missing authorization token", 401);
+  }
+
+  const authClient = createClient(supabaseUrl, supabaseServiceRoleKey || supabaseAnonKey);
 
   const {
     data: { user },
     error: userError,
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser(accessToken);
 
   if (userError || !user) {
     return jsonError("Unauthorized", 401);
   }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
 
   let content = "";
   let requestedThreadId: string | null = null;
