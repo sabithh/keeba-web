@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ChatBubble from "@/components/ChatBubble";
 import Sidebar from "@/components/Sidebar";
 import {
   JournalThread,
   JournalEntry,
   getJournalThreads,
   getJournalEntries,
-  createJournalThread,
   addJournalEntry,
   deleteJournalThread,
 } from "@/lib/api";
@@ -21,7 +19,7 @@ export default function JournalPage(): JSX.Element {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
-  const [passcodeError, setPasscodeError] = useState(false);
+  const [passcodeError, setPasscodeError] = useState<string | null>(null);
 
   const [threads, setThreads] = useState<JournalThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
@@ -51,7 +49,10 @@ export default function JournalPage(): JSX.Element {
 
   useEffect(() => {
     if (isAuthenticated) {
-      void loadThreads().then(loadHistory);
+      void (async () => {
+        const threadId = await loadThreads();
+        await loadHistory(threadId);
+      })();
     }
   }, [isAuthenticated]);
 
@@ -126,6 +127,8 @@ export default function JournalPage(): JSX.Element {
   async function handleNewJournal(): Promise<void> {
     setActiveThreadId(null);
     setEntries([]);
+    // Refresh thread list so sidebar stays in sync
+    void loadThreads(null);
   }
 
   async function handleDeleteThread(threadId: string): Promise<void> {
@@ -150,35 +153,43 @@ export default function JournalPage(): JSX.Element {
       <main className="min-h-[100dvh]">
         <Sidebar />
         <section className="flex flex-col items-center justify-center p-6 md:ml-[230px] min-h-[100dvh]">
-          <form 
+          <form
             className="surface-card p-6 w-full max-w-sm rounded-[16px]"
             onSubmit={(e) => {
               e.preventDefault();
-              if (passcode === "0360") setIsAuthenticated(true);
-              else setPasscodeError(true);
+              if (passcode === "0360") {
+                setPasscodeError(null);
+                setIsAuthenticated(true);
+              } else {
+                setPasscodeError("Incorrect passcode. Please try again.");
+                setPasscode("");
+              }
             }}
           >
-            <h2 className="text-xl font-bold text-keeba-accentLight mb-4">Journal Access</h2>
-            <p className="text-keeba-textMuted mb-4">Please enter the passcode to access your journal.</p>
-            <input 
+            <h2 className="text-xl font-bold text-keeba-accentLight mb-2">Journal Access</h2>
+            <p className="text-keeba-textMuted mb-5 text-sm">Enter your passcode to unlock your private journal.</p>
+            <input
               type="password"
-              placeholder="Passcode"
+              placeholder="Enter passcode"
               value={passcode}
-              onChange={(e) => { setPasscode(e.target.value); setPasscodeError(false); }}
-              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-text mb-4"
+              autoFocus
+              onChange={(e) => { setPasscode(e.target.value); setPasscodeError(null); }}
+              className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-text mb-2 focus:outline-none focus:border-keeba-accent"
             />
-            {passcodeError && <p className="text-red-400 text-sm mb-4">Incorrect passcode.</p>}
-            <div className="flex gap-2">
-              <button 
-                type="submit"
-                className="flex-1 rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface"
-              >
-                Unlock
-              </button>
-              <button 
+            {passcodeError && (
+              <p className="text-red-400 text-xs mb-3">{passcodeError}</p>
+            )}
+            <div className="flex gap-2 mt-3">
+              <button
                 type="button"
-                onClick={() => { if (passcode === "0360") setIsAuthenticated(true); else setPasscodeError(true); }}
-                className="flex-1 rounded-item border border-keeba-border bg-keeba-primary px-4 py-2 text-sm font-semibold text-keeba-text"
+                onClick={() => { setPasscode(""); setPasscodeError(null); }}
+                className="flex-1 rounded-item border border-keeba-border bg-transparent px-4 py-2 text-sm font-semibold text-keeba-textMuted hover:bg-keeba-primaryLight transition"
+              >
+                Clear
+              </button>
+              <button
+                type="submit"
+                className="flex-1 rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface hover:opacity-90 transition"
               >
                 Confirm
               </button>
