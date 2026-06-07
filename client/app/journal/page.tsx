@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import ChatBubble from "@/components/ChatBubble";
@@ -21,6 +21,7 @@ export default function JournalPage(): JSX.Element {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
+  const [passcodeError, setPasscodeError] = useState(false);
 
   const [threads, setThreads] = useState<JournalThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
@@ -149,33 +150,40 @@ export default function JournalPage(): JSX.Element {
       <main className="min-h-[100dvh]">
         <Sidebar />
         <section className="flex flex-col items-center justify-center p-6 md:ml-[230px] min-h-[100dvh]">
-          <div className="surface-card p-6 w-full max-w-sm rounded-[16px]">
+          <form 
+            className="surface-card p-6 w-full max-w-sm rounded-[16px]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (passcode === "0360") setIsAuthenticated(true);
+              else setPasscodeError(true);
+            }}
+          >
             <h2 className="text-xl font-bold text-keeba-accentLight mb-4">Journal Access</h2>
             <p className="text-keeba-textMuted mb-4">Please enter the passcode to access your journal.</p>
             <input 
               type="password"
               placeholder="Passcode"
               value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && passcode === "0360") {
-                  setIsAuthenticated(true);
-                } else if (e.key === "Enter") {
-                  alert("Incorrect passcode");
-                }
-              }}
+              onChange={(e) => { setPasscode(e.target.value); setPasscodeError(false); }}
               className="w-full rounded-item border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-text mb-4"
             />
-            <button 
-              onClick={() => {
-                if (passcode === "0360") setIsAuthenticated(true);
-                else alert("Incorrect passcode");
-              }}
-              className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface"
-            >
-              Unlock
-            </button>
-          </div>
+            {passcodeError && <p className="text-red-400 text-sm mb-4">Incorrect passcode.</p>}
+            <div className="flex gap-2">
+              <button 
+                type="submit"
+                className="flex-1 rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface"
+              >
+                Unlock
+              </button>
+              <button 
+                type="button"
+                onClick={() => { if (passcode === "0360") setIsAuthenticated(true); else setPasscodeError(true); }}
+                className="flex-1 rounded-item border border-keeba-border bg-keeba-primary px-4 py-2 text-sm font-semibold text-keeba-text"
+              >
+                Confirm
+              </button>
+            </div>
+          </form>
         </section>
       </main>
     );
@@ -258,21 +266,20 @@ export default function JournalPage(): JSX.Element {
         </div>
 
         <form onSubmit={handleAddEntry} className="border-t border-keeba-border p-4">
-          <div className="surface-card flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
-            <label className="flex-1 flex gap-2">
-              <span className="sr-only">Journal Entry</span>
+          <div className="surface-card flex flex-col gap-3 p-3">
+            <div className="flex gap-2 items-start">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                rows={3}
+                rows={4}
                 placeholder="Write your journal entry here..."
-                className="w-full resize-none rounded-keeba border border-keeba-border bg-keeba-primary flex-1 px-3 py-2 text-sm"
+                className="flex-1 resize-none rounded-keeba border border-keeba-border bg-keeba-primary px-3 py-2 text-sm text-keeba-text focus:outline-none focus:border-keeba-accent"
               />
               {hasSupport && (
                 <button
                   type="button"
                   onClick={toggleListening}
-                  className={"shrink-0 self-end p-2 rounded-full " + (isListening ? "bg-red-500/20 text-red-500" : "bg-keeba-primaryLight text-keeba-textMuted")}
+                  className={"shrink-0 p-2 rounded-full mt-1 " + (isListening ? "bg-red-500/20 text-red-500" : "bg-keeba-primaryLight text-keeba-textMuted")}
                   title={isListening ? "Stop voice input" : "Start voice input"}
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -283,14 +290,24 @@ export default function JournalPage(): JSX.Element {
                   </svg>
                 </button>
               )}
-            </label>
-            <button
-              type="submit"
-              disabled={saving || !input.trim()}
-              className="w-full rounded-item border border-keeba-border bg-keeba-accent px-4 py-2 text-sm font-semibold text-keeba-surface sm:w-auto"
-            >
-              {saving ? "Saving..." : "Save Entry"}
-            </button>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setInput("")}
+                disabled={!input.trim() || saving}
+                className="rounded-item border border-keeba-border bg-transparent px-4 py-2 text-sm font-semibold text-keeba-textMuted hover:bg-keeba-primaryLight transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Clear
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !input.trim()}
+                className="rounded-item border border-keeba-border bg-keeba-accent px-5 py-2 text-sm font-semibold text-keeba-surface hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving..." : "Confirm & Save"}
+              </button>
+            </div>
           </div>
         </form>
       </section>
